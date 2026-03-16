@@ -4,11 +4,11 @@ if (Test-Path $env:BASELINE_CHANGELOG_FILE) {
     Remove-Item $env:BASELINE_CHANGELOG_FILE -Force
 }
 
-if (Test-Path "baseline\sqls" -PathType Container) {
-    Remove-Item "baseline\sqls" -Recurse -Force
+if (Test-Path "baseline" -PathType Container) {
+    Remove-Item "baseline" -Recurse -Force
 }
 
-liquibase --changelog-file=$env:BASELINE_CHANGELOG_FILE generate-changelog --diff-types="tables,columns,indexes,foreignkeys,primarykeys,uniqueconstraints,functions,views,storedprocedures,triggers,sequences,catalogs,schemas"
+liquibase --changelog-file=$env:BASELINE_CHANGELOG_FILE generate-changelog 
 
 Get-Item $env:BASELINE_CHANGELOG_FILE | Select-Object Name, Length, LastWriteTime
 

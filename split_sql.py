@@ -45,7 +45,8 @@ directories = {
     'constraints': os.path.join(base_dir, 'baseline/sqls/constraints'),
     'types': os.path.join(base_dir, 'baseline/sqls/types'),
     'schemas': os.path.join(base_dir, 'baseline/sqls/schemas'),
-    'other': os.path.join(base_dir, 'baseline/sqls/other')
+    'other': os.path.join(base_dir, 'baseline/sqls/other'),
+    'data': os.path.join(base_dir, 'baseline/sqls/data')
 }
 
 for dir_path in directories.values():
@@ -53,6 +54,9 @@ for dir_path in directories.values():
 
 # Counters for naming files
 counters = {key: 1 for key in directories.keys()}
+
+# Accumulator for INSERT INTO statements grouped by schema.table
+data_inserts = {}
 
 # Process changesets
 i = 1
@@ -171,6 +175,21 @@ while i < len(changesets):
             schema_name = table_match.group(2).strip('[]') if table_match.group(2) else None
             object_name = table_match.group(3).strip('[]')
 
+    # Check for INSERT INTO statements - collect grouped by schema.table
+    elif re.search(r'^\s*INSERT\s+INTO', sql_content, re.IGNORECASE | re.MULTILINE):
+        insert_match = re.search(r'INSERT\s+INTO\s+\[?(\w+)\]?\.\[?(\w+)\]?', sql_content, re.IGNORECASE)
+        if insert_match:
+            table_key = f'{insert_match.group(1).strip("[]")}.{insert_match.group(2).strip("[]")}'
+        else:
+            bare_match = re.search(r'INSERT\s+INTO\s+\[?(\w+)\]?', sql_content, re.IGNORECASE)
+            table_key = bare_match.group(1).strip('[]') if bare_match else 'unknown'
+        if table_key not in data_inserts:
+            data_inserts[table_key] = []
+        data_inserts[table_key].append((changeset_line, sql_content))
+        counters['data'] += 1
+        i += 2
+        continue
+
     # Default to other if we can't determine
     if not object_type:
         object_type = 'other'
@@ -232,6 +251,18 @@ while i < len(changesets):
     counters[object_type] += 1
     i += 2
 
+# Write grouped INSERT INTO data files
+for table_key, entries in data_inserts.items():
+    filename = re.sub(r'[^\w\-_.]', '_', table_key)
+    file_path = os.path.join(directories['data'], f'{filename}.sql')
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write('-- liquibase formatted sql\n')
+        for changeset_line, sql_content in entries:
+            f.write(f'{changeset_line}\n')
+            f.write(sql_content)
+            if not sql_content.endswith('\n'):
+                f.write('\n')
+
 print("File splitting complete!")
 print(f"\nTotal changesets processed: {(len(changesets) - 1) // 2}")
 print("\nSummary:")
@@ -255,6 +286,7 @@ ordered_types = [
     'triggers',
     'synonyms',
     'other',
+    'data',
 ]
 
 changelog_path = os.path.join(base_dir, 'baseline', 'changelog.yml')
