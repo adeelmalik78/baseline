@@ -239,3 +239,32 @@ for obj_type, count in counters.items():
     actual_count = count - 1
     if actual_count > 0:
         print(f"  {obj_type}: {actual_count} files")
+
+# Generate changelog.yml in the baseline directory
+# Order matters for Liquibase: schemas -> types -> sequences -> tables -> indexes -> constraints -> views -> functions -> procedures -> triggers -> synonyms -> other
+ordered_types = [
+    'schemas',
+    'types',
+    'sequences',
+    'tables',
+    'indexes',
+    'constraints',
+    'views',
+    'functions',
+    'procedures',
+    'triggers',
+    'synonyms',
+    'other',
+]
+
+changelog_path = os.path.join(base_dir, 'baseline', 'changelog.yml')
+with open(changelog_path, 'w', encoding='utf-8') as f:
+    f.write('databaseChangeLog:\n')
+    for obj_type in ordered_types:
+        f.write(f'  - includeAll:\n')
+        f.write(f'      path: sqls/{obj_type}/\n')
+        f.write(f'      relativeToChangelogFile: true\n')
+        f.write(f'      endsWithFilter: .sql\n')
+        f.write(f'      errorIfMissingOrEmpty: false\n')
+
+print(f"\nGenerated: {changelog_path}")
